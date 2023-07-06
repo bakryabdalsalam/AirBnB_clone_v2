@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Fabric script based on the file 1-pack_web_static.py
+Fabric script based on the file 2-do_deploy_web_static.py
 """
 
 from fabric.api import env, put, run
@@ -10,6 +10,18 @@ from datetime import datetime
 env.hosts = ['18.209.178.99', '54.157.165.107']
 env.user = 'ubuntu'
 env.key_filename = '/alx-system_engineering-devops/0x0B-ssh/school.pub'
+
+
+def do_pack():
+    """Creates a compressed archive of the web_static folder"""
+    try:
+        now = datetime.now().strftime("%Y%m%d%H%M%S")
+        local("mkdir -p versions")
+        file_path = "versions/web_static_{}.tgz".format(now)
+        local("tar -czvf {} web_static".format(file_path))
+        return file_path
+    except:
+        return None
 
 
 def do_deploy(archive_path):
@@ -44,4 +56,12 @@ def do_deploy(archive_path):
         return True
     except:
         return False
+
+
+def deploy():
+    """Creates and distributes an archive to your web servers"""
+    archive_path = do_pack()
+    if not archive_path:
+        return False
+    return do_deploy(archive_path)
 
