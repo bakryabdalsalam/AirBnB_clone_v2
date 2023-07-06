@@ -1,68 +1,48 @@
 #!/usr/bin/python3
-'''
-fabric script to distribute an archive to web servers
-----NEEDS TO REVISIT SCRIPT
-'''
+"""
+Fabric script to distribute an archive to web servers using do_deploy function
+"""
 
-import os
-from datetime import datetime
-from fabric.api import env, local, put, run, runs_once
-
+from fabric.api import *
+import os.path
 
 env.hosts = ['18.209.178.99', '54.157.165.107']
+env.user = 'ubuntu'
+env.key_filename = '/alx-system_engineering-devops/0x0B-ssh/school.pub'
 
 
 def do_deploy(archive_path):
-    """Distributes an archive to a web server.
-    Args:
-        archive_path (str): The path of the archive to distribute.
-    Returns:
-        If the file doesn't exist at archive_path or an error occurs - False.
-        Otherwise - True.
     """
-    if not os.path.isdir("versions"):
-        os.mkdir("versions")
-    cur_time = datetime.now()
-    output = "versions/web_static_{}{}{}{}{}{}.tgz".format(
-        cur_time.year,
-        cur_time.month,
-        cur_time.day,
-        cur_time.hour,
-        cur_time.minute,
-        cur_time.second
-    )
-    try:
-        print("Packing web_static to {}".format(output))
-        local("tar -cvzf {} web_static".format(output))
-        archize_size = os.stat(output).st_size
-        print("web_static packed: {} -> {} Bytes".format(output, archize_size))
-    except Exception:
-        output = None
-    return output
-
-
-def do_deploy(archive_path):
-    """Deploys the static files to the host servers.
-    Args:
-        archive_path (str): The path to the archived static files.
+    Distributes an archive to web servers
     """
     if not os.path.exists(archive_path):
         return False
-    file_name = os.path.basename(archive_path)
-    folder_name = file_name.replace(".tgz", "")
-    folder_path = "/data/web_static/releases/{}/".format(folder_name)
-    success = False
+
     try:
-        put(archive_path, "/tmp/{}".format(file_name))
-        run("mkdir -p {}".format(folder_path))
-        run("tar -xzf /tmp/{} -C {}".format(file_name, folder_path))
-        run("rm -rf /tmp/{}".format(file_name))
-        run("mv {}web_static/* {}".format(folder_path, folder_path))
-        run("rm -rf {}web_static".format(folder_path))
-        run("rm -rf /data/web_static/current")
-        run("ln -s {} /data/web_static/current".format(folder_path))
-        print('New version deployed!')
-        success = True
-    except Exception:
-        success = False
-    return success
+        archive_name = os.path.basename(archive_path)
+        archive_no_ext = os.path.splitext(archive_name)[0]
+
+        # Upload the archive to the /tmp/ directory of the web server
+        put(archive_path, "/tmp/")
+
+        # Uncompress the archive to the folder /data/web_static/releases/<archive filename without extension>
+        run("sudo mkdir -p /data/web_static/releases/{}".format(archive_no_ext))
+
+        with cd("/data/web_static/releases/{}".format(archive_no_ext)):
+            run("sudo tar -xzf /tmp/{} -C .".format(archive_name))
+
+        run("rm /tmp/{}".format(archive_name))
+
+        # Delete the symbolic link /data/web_static/current from the web server
+        run("sudo rm -f /data/web_static/current")
+
+        # Create a new symbolic link /data/web_static/current linked to the new version
+        run("sudo ln -s /data/web_static/releases/{} /data/web_static/current".format(archive_no_ext))
+
+        print("New version deployed!")
+        return True
+
+    except Exception as e:
+        print("Deployment failed:", str(e))
+        return False
+
